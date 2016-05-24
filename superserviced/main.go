@@ -15,6 +15,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+	fmt.Println("pid", cmd.Process.Pid)
 	err = cmd.Wait()
 	fmt.Println("wait", err)
 }
