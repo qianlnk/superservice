@@ -8,6 +8,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"golang.org/x/net/websocket"
+
 	"qianno.xie/superservice/superserviced/api"
 )
 
@@ -52,7 +54,7 @@ func main() {
 	//	for {
 	//		time.Sleep(1 * time.Minute)
 	//	}
-	http.HandleFunc("/Cmd", api.CmdHandle)
+	http.Handle("/Cmd", websocket.Handler(api.CmdHandle))
 	http.HandleFunc("Release", api.ReleaseHandle)
 
 	// initialize server

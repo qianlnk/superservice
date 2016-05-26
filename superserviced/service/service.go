@@ -20,9 +20,9 @@ type Service struct {
 	User        string
 	AutoStart   bool
 	AutoRestart bool
-	Status      string
-	Cmd         *exec.Cmd
-	StartTime   time.Time
+	status      string
+	cmd         *exec.Cmd
+	startTime   time.Time
 	killSelf    bool
 }
 
@@ -31,6 +31,7 @@ type Services map[string]*Service
 var (
 	Mu          sync.Mutex
 	ServiceList Services
+	Message     chan string
 )
 
 const (
@@ -38,12 +39,47 @@ const (
 	STOP    = "STOP"
 )
 
+func MSG_UPDATE(name string) string {
+	return fmt.Sprintf("service %s updating", name)
+}
+
+func MSG_ADD(name string) string {
+	return fmt.Sprintf("service %s adding", name)
+}
+
+func MSG_DELETE(name string) string {
+	return fmt.Sprintf("service %s deleting", name)
+}
+
+func MSG_START(name string) string {
+	return fmt.Sprintf("service %s starting", name)
+}
+
+func MSG_STOP(name string) string {
+	return fmt.Sprintf("service %s stoping", name)
+}
+
+func MSG_OK(name string) string {
+	return fmt.Sprintf("service %s ok", name)
+}
+
+func MSG_NO_CHANGE(name string) string {
+	return fmt.Sprintf("service %s no change", name)
+}
+
+func MSG_ERROR(err error) string {
+	return fmt.Sprintf("Err: %s", err.Error())
+}
+
+func MSG_EXIT(funcname string) string {
+	return fmt.Sprintf("func %s exit", funcname)
+}
 func init() {
 	ServiceList = make(map[string]*Service)
 	go ServiceList.AotoRestart()
 }
 
-func newService(name, command, dir, username string, start, restart bool) (*Service, error) {
+func newService(name, command, dir, username string, start, restart bool) *Service {
 	return &Service{
 		Name:        name,
 		Command:     command,
@@ -51,60 +87,101 @@ func newService(name, command, dir, username string, start, restart bool) (*Serv
 		User:        username,
 		AutoStart:   start,
 		AutoRestart: restart,
-		Status:      STOP,
-		Cmd:         nil,
-		StartTime:   time.Now(),
+		status:      STOP,
+		cmd:         nil,
+		startTime:   time.Now(),
 		killSelf:    false,
-	}, nil
+	}
 }
-func (svclst Services) UpdateService(name, command, dir, user string, start, restart bool) error {
+func (svclst Services) UpdateService(name, command, dir, user string, start, restart bool, msg chan string) {
 	runbefore := false
 	if v, ok := svclst[name]; ok {
+		msg <- MSG_UPDATE(name)
 		if v.Command != command || v.Directory != dir || v.User != user || v.AutoStart != start || v.AutoRestart != restart {
-			if v.Status == RUNNING {
+			if v.status == RUNNING {
 				runbefore = true
-				err := svclst[name].Stop()
+				err := svclst[name].Stop(msg)
 				if err != nil {
-					return err
+					return
 				}
 			}
-			service, err := newService(name, command, dir, user, start, restart)
-			if err != nil {
-				return err
-			}
-			svclst[name] = service
+			svclst[name] = newService(name, command, dir, user, start, restart)
+			msg <- MSG_OK(name)
+		} else {
+			msg <- MSG_NO_CHANGE(name)
 		}
 	} else {
-		service, err := newService(name, command, dir, user, start, restart)
-		if err != nil {
-			return err
-		}
-		svclst[name] = service
+		msg <- MSG_ADD(name)
+		svclst[name] = newService(name, command, dir, user, start, restart)
+		msg <- MSG_OK(name)
 	}
-	fmt.Println(name)
+
 	if svclst[name].AutoStart == true || runbefore == true {
-		return svclst[name].Start()
+		svclst[name].Start(msg)
 	}
-	return nil
 }
 
+func discardMsg(msg chan string) {
+	for {
+		select {
+		case m := <-msg:
+			if strings.Contains(m, "exit") || strings.Contains(m, "stop ok") {
+				close(msg)
+				return
+			}
+		}
+	}
+}
 func (svclst Services) AotoRestart() {
 	ticker := time.NewTicker(time.Second * time.Duration(20))
 	for range ticker.C {
 		for k, v := range svclst {
-			if v.Status == STOP && v.AutoRestart {
-				err := svclst[k].Start()
-				if err != nil {
-					fmt.Println(err)
-				}
+			fmt.Println(k, v)
+			if v.status == STOP && v.AutoRestart {
+				msg := make(chan string)
+				go discardMsg(msg)
+				svclst[k].Start(msg)
 			}
 		}
 	}
 }
 
-func (svc *Service) Start() error {
-	if svc.Status == RUNNING {
-		return errors.New(fmt.Sprintf("%s already running.", svc.Name))
+func (svclst Services) Close() {
+	for k, _ := range svclst {
+		msg := make(chan string)
+		go discardMsg(msg)
+		err := svclst[k].Stop(msg)
+		if err != nil {
+			fmt.Println(err)
+		}
+		delete(svclst, k)
+	}
+}
+
+func (svclst Services) Delete(serviceName string, msg chan string) {
+	if _, ok := svclst[serviceName]; ok {
+		err := svclst[serviceName].Stop(msg)
+		if err != nil {
+			return
+		}
+		svclst[serviceName] = nil
+		delete(svclst, serviceName)
+	}
+}
+func (svclst Services) List(msg chan string) {
+	for _, v := range svclst {
+		//{"Name":"xzj","Command":"./hello/hello xzj","Directory":"","User":"xiezhenjia","AutoStart":true,"AutoRestart":true}
+		tmpmsg := fmt.Sprintf("{\"Service\":\"%s\",\"Status\":\"%s\",\"Pid\":%d,\"User\":\"%s\", \"Command\":\"%s\"}",
+			v.Name, v.status, v.cmd.Process.Pid, v.User, v.Command)
+		msg <- string(tmpmsg)
+	}
+}
+
+func (svc *Service) Start(msg chan string) {
+	msg <- MSG_START(svc.Name)
+	if svc.status == RUNNING {
+		msg <- MSG_ERROR(errors.New(fmt.Sprintf("%s already running.", svc.Name)))
+		return
 	}
 	go func() {
 		commands := strings.Fields(svc.Command)
@@ -115,7 +192,7 @@ func (svc *Service) Start() error {
 		cmd := exec.Command(commands[0], arg...)
 		runuser, err := user.Lookup(svc.User)
 		if err != nil {
-			fmt.Println("user", err)
+			msg <- MSG_ERROR(err)
 			return
 		}
 		uid, _ := strconv.Atoi(runuser.Uid)
@@ -128,42 +205,47 @@ func (svc *Service) Start() error {
 		cmd.Stdin = os.Stdin
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
-		svc.Cmd = cmd
-		err = svc.Cmd.Start()
+		svc.cmd = cmd
+		err = svc.cmd.Start()
 		if err != nil {
-			fmt.Println("start:", err)
+			msg <- MSG_ERROR(err)
 			return
 		}
-		svc.Status = RUNNING
-		svc.StartTime = time.Now()
-		err = svc.Cmd.Wait()
-		svc.Status = STOP
-		svc.Cmd.Process.Release()
+		svc.status = RUNNING
+		svc.startTime = time.Now()
+		msg <- MSG_OK(svc.Name)
+		err = svc.cmd.Wait()
+		svc.status = STOP
+		svc.cmd.Process.Release()
 		if err != nil && svc.killSelf == false {
-			fmt.Println("wait:", err)
+			msg <- MSG_ERROR(err)
 			return
 		}
+		msg <- MSG_EXIT("start")
 	}()
-	return nil
 }
 
-func (svc *Service) Stop() error {
-	if svc.Status == STOP {
+func (svc *Service) Stop(msg chan string) error {
+	msg <- MSG_STOP(svc.Name)
+	if svc.status == STOP {
+		msg <- MSG_OK(svc.Name)
 		return nil
 	}
-	err := svc.Cmd.Process.Kill()
+	err := svc.cmd.Process.Kill()
 	if err != nil {
+		msg <- MSG_ERROR(err)
 		return err
 	}
-	svc.Status = STOP
+	svc.status = STOP
 	svc.killSelf = true
+	msg <- MSG_OK(svc.Name + " stop")
 	return nil
 }
 
-func (svc *Service) Restart() error {
-	err := svc.Stop()
+func (svc *Service) Restart(msg chan string) {
+	err := svc.Stop(msg)
 	if err != nil {
-		return err
+		return
 	}
-	return svc.Start()
+	svc.Start(msg)
 }
