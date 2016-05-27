@@ -24,7 +24,7 @@ type Message struct {
 
 //list start stop restart delete update add log
 type Cmd struct {
-	Type string
+	Type string `json: "Type"`
 	service.Service
 }
 
