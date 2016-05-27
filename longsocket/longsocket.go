@@ -13,7 +13,7 @@ import (
 
 const (
 	SHAKE_HANDS_MSG       = "{\"Status\":\"OK\", \"Message\":\"This is shake hands message.\"}"
-	SHAKE_HANDS_FREQUENCY = 60
+	SHAKE_HANDS_FREQUENCY = 5
 )
 
 const CHAN_SIZE = 1
@@ -41,8 +41,8 @@ type Longsocket struct {
 func NewConn(url, protocol, origin string, shankhand bool, buffersize int) *Longsocket {
 	return &Longsocket{
 		Ws:         nil,
-		writeCh:    make(chan []byte, CHAN_SIZE),
-		readCh:     make(chan []byte, CHAN_SIZE),
+		writeCh:    make(chan []byte),
+		readCh:     make(chan []byte),
 		ReadBuf:    make([]byte, buffersize),
 		ShakeHand:  shankhand,
 		Url:        url,
@@ -173,11 +173,13 @@ func (l *Longsocket) ReadLoop() {
 		}
 
 		n, err := l.Ws.Read(l.ReadBuf)
+		//fmt.Println("n = ", n, "l.ReadBuf = ", l.ReadBuf, err)
 		if err != nil {
 			break
 		}
-
-		if n > 0 && string(l.ReadBuf[0:n]) != SHAKE_HANDS_MSG {
+		//fmt.Println("n = ", n, "l.ReadBuf = ", l.ReadBuf)
+		//&& string(l.ReadBuf[0:n]) != SHAKE_HANDS_MSG
+		if n > 0 {
 			l.readCh <- l.ReadBuf[0:n]
 		}
 	}
@@ -188,11 +190,17 @@ type dealmsg func([]byte) error
 
 func (l *Longsocket) Read(f dealmsg) {
 	for {
+		if l.Status != STATUS_CONNECT {
+			break
+		}
+
 		select {
 		case msg := <-l.readCh:
-			err := f(msg)
-			if err != nil {
-				l.Write([]byte(err.Error()))
+			{
+				err := f(msg)
+				if err != nil {
+					l.Write([]byte(err.Error()))
+				}
 			}
 		}
 	}

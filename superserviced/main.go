@@ -10,7 +10,8 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"qianno.xie/superservice/superserviced/api"
+	"qianno.xie/superservice/superserviced/command"
+	"qianno.xie/superservice/superserviced/release"
 )
 
 func main() {
@@ -54,8 +55,8 @@ func main() {
 	//	for {
 	//		time.Sleep(1 * time.Minute)
 	//	}
-	http.Handle("/Cmd", websocket.Handler(api.CmdHandle))
-	http.HandleFunc("Release", api.ReleaseHandle)
+	http.Handle("/Cmd", websocket.Handler(command.CmdHandle))
+	http.HandleFunc("/Release", release.ReleaseHandle)
 
 	// initialize server
 	srv := &http.Server{

@@ -1,12 +1,12 @@
-package api
+package command
 
 import (
 	"fmt"
-	"net/http"
+	//"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/golang/glog"
+	//"github.com/golang/glog"
 
 	"golang.org/x/net/websocket"
 
@@ -62,7 +62,7 @@ func dealCommand(cmd Cmd) {
 }
 
 func dealMsg(msg []byte) error {
-	fmt.Println(msg)
+	fmt.Println("dealMsg", string(msg))
 	return nil
 }
 
@@ -80,6 +80,7 @@ func sendMessage(msg chan string) {
 }
 
 func Verify(user, password string) bool {
+	fmt.Println(user, password)
 	return true
 }
 
@@ -100,12 +101,9 @@ func CmdHandle(ws *websocket.Conn) {
 	}
 
 	apiSocket := longsocket.NewConn("", "", "", false, 128*1024)
+	apiSocket.SetSocket(ws)
 	defer apiSocket.Close()
 	go apiSocket.WriteLoop()
 	go apiSocket.ReadLoop()
 	apiSocket.Read(dealMsg)
-}
-
-func ReleaseHandle(res http.ResponseWriter, req *http.Request) {
-	glog.Infof("release handle start")
 }

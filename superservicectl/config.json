@@ -1,0 +1,26 @@
+{
+	"MachineList": [
+		{
+			"Name": "testMachine1",
+			"Host": "127.0.0.1",
+			"Port": "5260",
+			"ServiceList":[
+				{
+					"Name": "helloLnk",
+					"Command": "./hello/hello lnk",
+					"Directory": "/user/local/hello",
+					"User": "root",
+					"AutoStart": true,
+					"AutoRestart": true
+				},{
+					"Name": "helloXzj",
+					"Command": "./hello/hello xzj",
+					"Directory": "/user/local/hello",
+					"User": "xiezhenjia",
+					"AutoStart": true,
+					"AutoRestart": true
+				}
+			]	
+		}
+	]
+}
