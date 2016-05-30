@@ -117,7 +117,7 @@ func (l *Longsocket) Close() {
 func (l *Longsocket) WriteLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println(err)
+			fmt.Println("writeloop", err)
 		}
 	}()
 
@@ -163,7 +163,7 @@ func (l *Longsocket) Write(buf []byte) error {
 func (l *Longsocket) ReadLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println(err)
+			fmt.Println("readloop", err)
 		}
 	}()
 
