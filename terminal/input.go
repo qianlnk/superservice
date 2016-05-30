@@ -2,6 +2,7 @@ package input
 
 import (
 	"fmt"
+	"sync"
 )
 
 const (
@@ -11,56 +12,149 @@ const (
 	SYS_ASCII_ETX        = 3
 )
 
-var history_list []string
-var sys_cmd_list []string
+const (
+	SYS_MAX_HISTORY = 100
+)
 
-//cursor movement
-func MOVE_UP(x int) {
+type Terminal struct {
+	prompt       string
+	historyList  []string
+	historyIndex int
+	history      bool
+	sysCmdList   []string
+	sysCmdMaxLen int
+	echo         bool
+	cursorX      int
+	cursorY      int
+	lock         sync.Mutex
+}
+
+func NewTerminal(prompt string) *Terminal {
+	return &Terminal{
+		prompt:       prompt,
+		historyIndex: 0,
+		history:      true,
+		echo:         true,
+		cursorX:      0,
+		cursorY:      len(prompt),
+	}
+}
+
+func (tm *Terminal) SetSystemCommand(cmdlist []string) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+	tm.sysCmdList = append(tm.sysCmdList, cmdlist...)
+	for _, cmd := range cmdlist {
+		if len(cmd) > tm.sysCmdMaxLen {
+			tm.sysCmdMaxLen = len(cmd)
+		}
+	}
+}
+
+func (tm *Terminal) History(addToHistory bool) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+	tm.history = addToHistory
+}
+
+func (tm *Terminal) Echo(echo bool) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+	tm.echo = echo
+}
+
+func (tm *Terminal) addXY(x, y int) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+	tm.cursorX += x
+	tm.cursorY += y
+}
+
+func (tm *Terminal) cursorMoveUp(x int) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
 	if x <= 0 {
 		return
 	}
-	fmt.Printf("\033[%dA", x)
+	if tm.cursorX <= 0 {
+		return
+	}
+	if x >= tm.cursorX {
+		fmt.Printf("\033[%dA", tm.cursorX)
+		tm.cursorX = 0
+	} else {
+		fmt.Printf("\033[%dA", x)
+		tm.cursorX -= x
+	}
 }
 
-func MOVE_DOWN(x int) {
+func (tm *Terminal) cursorMoveDown(x int) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
 	if x <= 0 {
 		return
 	}
 	fmt.Printf("\033[%dB", x)
+	tm.cursorX += x
+
 }
-func MOVE_RIGHT(y int) {
+
+func (tm *Terminal) cursorMoveRight(y int) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
 	if y <= 0 {
 		return
 	}
 	fmt.Printf("\033[%dC", y)
+	tm.cursorY += y
 }
-func MOVE_LEFT(y int) {
+
+func (tm *Terminal) cursorMoveLeft(y int) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
 	if y <= 0 {
 		return
 	}
-	fmt.Printf("\033[%dD", y)
-}
-func MOVE_TO(x, y int) { fmt.Printf("\033[%d;%dH", (x), (y)) }
-func RESET_CURSOR()    { fmt.Printf("\033[H") }
-func HIDE_CURSOR()     { fmt.Printf("\033[?25l") }
-func SHOW_CURSOR()     { fmt.Printf("\033[?25h") }
-func SAVE_CURSOR()     { fmt.Printf("\033[s") }
-func RETURN_CURSOR()   { fmt.Printf("\033[u") }
-
-func SetSystemCommand(cmdlist []string) {
-	sys_cmd_list = append(sys_cmd_list, cmdlist...)
-}
-
-func cleanCell(num int) {
-	for i := 0; i < num; i++ {
-		fmt.Printf(" ")
+	if tm.cursorY <= 0 {
+		return
+	}
+	if y >= tm.cursorY {
+		fmt.Printf("\033[%dD", tm.cursorY)
+		tm.cursorY = 0
+	} else {
+		fmt.Printf("\033[%dD", y)
+		tm.cursorY -= y
 	}
 }
 
-func GetInput(echo bool, history bool) string {
+func (tm *Terminal) cursorMoveTo(x, y int) {
+	if x >= tm.cursorX {
+		tm.cursorMoveDown(x - tm.cursorX)
+	} else {
+		tm.cursorMoveUp(tm.cursorX - x)
+	}
+
+	if y >= tm.cursorY {
+		tm.cursorMoveRight(y - tm.cursorY)
+	} else {
+		tm.cursorMoveLeft(tm.cursorY - y)
+	}
+
+	tm.cursorX = x
+	tm.cursorY = y
+}
+
+func (tm *Terminal) getXY() (int, int) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+	return tm.cursorX, tm.cursorY
+}
+
+func (tm *Terminal) getInput() string {
 	var cmd []byte
 	var leftCmd, rightCmd []byte
-	var historyIndex = len(history_list)
+	tm.cursorX = 0
+	tm.cursorY = len(tm.prompt)
 	for {
 		buf, parse := getch()
 		if buf == SYS_ASCII_LF {
@@ -68,44 +162,48 @@ func GetInput(echo bool, history bool) string {
 		}
 		switch buf {
 		case SYS_UP:
-			if !echo {
+			if !tm.echo || tm.historyIndex == 0 {
 				break
 			}
-			if historyIndex > 0 {
-				historyIndex--
-				MOVE_LEFT(len(leftCmd))
+			if tm.historyIndex > 0 {
+				tm.historyIndex--
+				tm.cursorMoveLeft(len(leftCmd))
 				cleanCell(len(leftCmd) + len(rightCmd))
-				MOVE_LEFT(len(leftCmd) + len(rightCmd))
-				leftCmd = []byte(history_list[historyIndex])
+				tm.addXY(0, len(leftCmd)+len(rightCmd))
+				tm.cursorMoveLeft(len(leftCmd) + len(rightCmd))
+				leftCmd = []byte(tm.historyList[tm.historyIndex])
 				rightCmd = nil
 				fmt.Printf("%s", string(leftCmd))
+				tm.addXY(0, len(leftCmd))
 			}
 			break
 		case SYS_DOWN:
-			if !echo {
+			if !tm.echo {
 				break
 			}
-			if historyIndex < len(history_list) {
-				historyIndex++
-				MOVE_LEFT(len(leftCmd))
+			if tm.historyIndex < len(tm.historyList) {
+				tm.historyIndex++
+				tm.cursorMoveLeft(len(leftCmd))
 				cleanCell(len(leftCmd) + len(rightCmd))
-				MOVE_LEFT(len(leftCmd) + len(rightCmd))
-				if historyIndex >= len(history_list) {
+				tm.addXY(0, len(leftCmd)+len(rightCmd))
+				tm.cursorMoveLeft(len(leftCmd) + len(rightCmd))
+				if tm.historyIndex >= len(tm.historyList) {
 					leftCmd = nil
 					rightCmd = nil
 				} else {
-					leftCmd = []byte(history_list[historyIndex])
+					leftCmd = []byte(tm.historyList[tm.historyIndex])
 					rightCmd = nil
 				}
 				fmt.Printf("%s", string(leftCmd))
+				tm.addXY(0, len(leftCmd))
 			}
 			break
 		case SYS_LEFT:
-			if !echo {
+			if !tm.echo {
 				break
 			}
 			if len(leftCmd) > 0 {
-				MOVE_LEFT(1)
+				tm.cursorMoveLeft(1)
 				var tmpRight []byte
 				tmpRight = append(tmpRight, leftCmd[len(leftCmd)-1])
 				rightCmd = append(tmpRight, rightCmd...)
@@ -117,36 +215,36 @@ func GetInput(echo bool, history bool) string {
 			}
 			break
 		case SYS_RIGHT:
-			if !echo {
+			if !tm.echo {
 				break
 			}
 			if len(rightCmd) > 0 {
-				MOVE_RIGHT(1)
-				leftCmd = append(leftCmd, rightCmd[len(rightCmd)-1])
+				tm.cursorMoveRight(1)
+				leftCmd = append(leftCmd, rightCmd[0])
 				rightCmd = rightCmd[1:]
 			}
 			break
 		case SYS_PARSE:
-			if echo {
+			if tm.echo {
 				fmt.Printf("%s%s", parse, string(rightCmd))
 			} else {
 				for i := 0; i < len(parse)+len(rightCmd); i++ {
 					fmt.Printf("*")
 				}
 			}
+			tm.addXY(0, len(parse))
 			if len(rightCmd) != 0 {
-				MOVE_LEFT(len(rightCmd))
+				tm.cursorMoveLeft(len(rightCmd))
 			}
 			leftCmd = append(leftCmd, []byte(parse)...)
 			break
 		case SYS_ASCII_TAB:
-			if !echo {
+			if !tm.echo {
 				break
 			}
-			if len(sys_cmd_list) > 0 {
+			if len(tm.sysCmdList) > 0 {
 				var sameCmdList []string
-				for _, cmd := range sys_cmd_list {
-					//fmt.Printf("\n~~~cmd = %s, leftCmd = %s~~\n", cmd, leftCmd)
+				for _, cmd := range tm.sysCmdList {
 					if len(leftCmd) > len(cmd) {
 						continue
 					}
@@ -154,23 +252,21 @@ func GetInput(echo bool, history bool) string {
 						sameCmdList = append(sameCmdList, cmd)
 					}
 				}
-				if len(sameCmdList) > 0 {
-					MOVE_LEFT(len(leftCmd))
-					leftCmd = []byte(sameCmdList[0])
-					fmt.Printf("%s", string(leftCmd))
-					if len(sameCmdList) > 1 {
-						SAVE_CURSOR()
-						var showSameCmd string
-						for i, cmd := range sameCmdList {
-							if i != 0 {
-								showSameCmd += fmt.Sprintf("\t")
-							}
-							showSameCmd += fmt.Sprintf("%s", cmd)
+				if len(sameCmdList) > 1 {
+					var showSameCmd string
+					for i, cmd := range sameCmdList {
+						if i != 0 {
+							//showSameCmd += fmt.Sprintf("")
 						}
-						fmt.Printf("\n%s", showSameCmd)
-						RETURN_CURSOR()
-						//MOVE_UP(1)
+						showSameCmd += fmt.Sprintf("%-30s", cmd)
 					}
+					tm.cursorMoveLeft(len(leftCmd) + len(tm.prompt))
+					fmt.Printf("%s", showSameCmd)
+				}
+				if len(sameCmdList) > 0 {
+					leftCmd = []byte(sameCmdList[0])
+					fmt.Printf("\n%s%s", tm.prompt, string(leftCmd))
+					tm.addXY(0, len(leftCmd))
 				}
 			}
 			break
@@ -181,33 +277,42 @@ func GetInput(echo bool, history bool) string {
 				} else {
 					leftCmd = nil
 				}
-				MOVE_LEFT(1)
+				tm.cursorMoveLeft(1)
 				fmt.Printf("%s%c", string(rightCmd), ' ')
-				MOVE_LEFT(len(rightCmd) + 1)
+				tm.addXY(0, len(rightCmd)+1)
+				tm.cursorMoveLeft(len(rightCmd) + 1)
 			}
 			break
 		default:
-			if echo {
+			if tm.echo {
 				fmt.Printf("%c%s", buf, string(rightCmd))
 			} else {
 				fmt.Printf("*")
 			}
+			tm.cursorY++
 			if len(rightCmd) != 0 {
-				MOVE_LEFT(len(rightCmd))
+				tm.cursorMoveLeft(len(rightCmd))
 			}
 			leftCmd = append(leftCmd, byte(buf))
 		}
 	}
 	cmd = append(cmd, leftCmd...)
 	cmd = append(cmd, rightCmd...)
-	if history {
+	if tm.history {
 		if len(cmd) != 0 {
-			if len(history_list) == 0 {
-				history_list = append(history_list, string(cmd))
-			} else if history_list[len(history_list)-1] != string(cmd) {
-				history_list = append(history_list, string(cmd))
+			if len(tm.historyList) == 0 {
+				tm.historyList = append(tm.historyList, string(cmd))
+			} else if tm.historyList[len(tm.historyList)-1] != string(cmd) {
+				tm.historyList = append(tm.historyList, string(cmd))
 			}
 		}
+		tm.historyIndex = len(tm.historyList)
 	}
 	return string(cmd)
+}
+
+func cleanCell(num int) {
+	for i := 0; i < num; i++ {
+		fmt.Printf(" ")
+	}
 }
