@@ -2,6 +2,7 @@ package input
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -153,12 +154,43 @@ func (tm *Terminal) getXY() (int, int) {
 func (tm *Terminal) getInput() string {
 	var cmd []byte
 	var leftCmd, rightCmd []byte
+	tabYet := false
+	tabIndex := -1
 	tm.cursorX = 0
+	tabLine := 0
 	tm.cursorY = len(tm.prompt)
+	var sameCmdList []string
 	for {
 		buf, parse := getch()
+
+		if buf == SYS_ASCII_TAB && tabYet == true {
+			tabYet = true
+			tabIndex++
+		} else if tabYet == true {
+			if buf != SYS_ASCII_LF {
+				tabYet = false
+			}
+			tabIndex = -1
+			sameCmdList = nil
+			_, tabY := tm.getXY()
+			tm.cursorMoveLeft(tabY)
+			for i := 0; i < tabLine; i++ {
+				tm.cursorMoveDown(1)
+				cleanLine()
+			}
+			tm.cursorMoveUp(tabLine)
+			tm.cursorMoveRight(tabY)
+		}
 		if buf == SYS_ASCII_LF {
-			break
+			if tabYet == true {
+				tabYet = false
+				fmt.Printf(" ")
+				leftCmd = append(leftCmd, byte(' '))
+				tm.addXY(0, 1)
+				continue
+			} else {
+				break
+			}
 		}
 		switch buf {
 		case SYS_UP:
@@ -243,30 +275,70 @@ func (tm *Terminal) getInput() string {
 				break
 			}
 			if len(tm.sysCmdList) > 0 {
-				var sameCmdList []string
-				for _, cmd := range tm.sysCmdList {
-					if len(leftCmd) > len(cmd) {
-						continue
-					}
-					if string(leftCmd) == string([]byte(cmd)[0:len(leftCmd)]) {
-						sameCmdList = append(sameCmdList, cmd)
-					}
-				}
-				if len(sameCmdList) > 1 {
-					var showSameCmd string
-					for i, cmd := range sameCmdList {
-						if i != 0 {
-							//showSameCmd += fmt.Sprintf("")
+				if tabYet == false {
+					for _, cmd := range tm.sysCmdList {
+						if len(leftCmd) > len(cmd) {
+							continue
 						}
-						showSameCmd += fmt.Sprintf("%-30s", cmd)
+						if string(leftCmd) == string([]byte(cmd)[0:len(leftCmd)]) {
+							sameCmdList = append(sameCmdList, cmd)
+						}
 					}
-					tm.cursorMoveLeft(len(leftCmd) + len(tm.prompt))
-					fmt.Printf("%s", showSameCmd)
-				}
-				if len(sameCmdList) > 0 {
-					leftCmd = []byte(sameCmdList[0])
-					fmt.Printf("\n%s%s", tm.prompt, string(leftCmd))
-					tm.addXY(0, len(leftCmd))
+
+					if len(sameCmdList) == 1 {
+						tm.cursorMoveLeft(len(leftCmd))
+						cleanCell(len(leftCmd))
+						tm.addXY(0, len(leftCmd))
+						tm.cursorMoveLeft(len(leftCmd))
+						leftCmd = []byte(sameCmdList[0])
+						fmt.Printf("%s", string(leftCmd))
+						tm.addXY(0, len(leftCmd))
+					} else if len(sameCmdList) > 1 {
+						x, y := tm.getXY()
+						for i, cmd := range sameCmdList {
+							if i%3 == 0 {
+								fmt.Println()
+								tm.cursorX++
+								tm.cursorY = 0
+							}
+							fmt.Printf("%-30s ", cmd)
+							tm.cursorY += 31
+						}
+						tabLine = tm.cursorX - x
+						tm.cursorMoveUp(tm.cursorX - x)
+						tm.cursorMoveLeft(tm.cursorY - y)
+					}
+					tabYet = true
+				} else {
+					if len(sameCmdList) > 1 {
+						x, y := tm.getXY()
+						if tabIndex == len(sameCmdList) {
+							tabIndex = 0
+						}
+						for i, cmd := range sameCmdList {
+							if i%3 == 0 {
+								fmt.Println()
+								tm.cursorX++
+								tm.cursorY = 0
+							}
+							if i == tabIndex {
+								fmt.Printf("\033[31;47m%-30s\033[0m ", cmd)
+							} else {
+								fmt.Printf("%-30s ", cmd)
+							}
+							tm.cursorY += 31
+						}
+						tm.cursorMoveUp(tm.cursorX - x)
+						tm.cursorMoveLeft(tm.cursorY - y)
+
+						tm.cursorMoveLeft(len(leftCmd))
+						cleanCell(len(leftCmd))
+						tm.addXY(0, len(leftCmd))
+						tm.cursorMoveLeft(len(leftCmd))
+						leftCmd = []byte(sameCmdList[tabIndex])
+						fmt.Printf("%s", string(leftCmd))
+						tm.addXY(0, len(leftCmd))
+					}
 				}
 			}
 			break
@@ -283,6 +355,8 @@ func (tm *Terminal) getInput() string {
 				tm.cursorMoveLeft(len(rightCmd) + 1)
 			}
 			break
+		case SYS_ASCII_ETX:
+			return ""
 		default:
 			if tm.echo {
 				fmt.Printf("%c%s", buf, string(rightCmd))
@@ -299,20 +373,42 @@ func (tm *Terminal) getInput() string {
 	cmd = append(cmd, leftCmd...)
 	cmd = append(cmd, rightCmd...)
 	if tm.history {
-		if len(cmd) != 0 {
+		if len(strings.Trim(string(cmd), " ")) != 0 {
 			if len(tm.historyList) == 0 {
-				tm.historyList = append(tm.historyList, string(cmd))
-			} else if tm.historyList[len(tm.historyList)-1] != string(cmd) {
-				tm.historyList = append(tm.historyList, string(cmd))
+				tm.historyList = append(tm.historyList, strings.Trim(string(cmd), " "))
+			} else if tm.historyList[len(tm.historyList)-1] != strings.Trim(string(cmd), " ") {
+				tm.historyList = append(tm.historyList, strings.Trim(string(cmd), " "))
 			}
 		}
 		tm.historyIndex = len(tm.historyList)
 	}
-	return string(cmd)
+	return strings.Trim(string(cmd), " ")
 }
 
 func cleanCell(num int) {
 	for i := 0; i < num; i++ {
 		fmt.Printf(" ")
 	}
+}
+
+func cleanLine() {
+	fmt.Printf("\033[K")
+}
+
+func (tm *Terminal) GetCommand() string {
+	tm.History(true)
+	tm.Echo(true)
+	return tm.getInput()
+}
+
+func (tm *Terminal) GetUser() string {
+	tm.History(false)
+	tm.Echo(true)
+	return tm.getInput()
+}
+
+func (tm *Terminal) GetPassword() string {
+	tm.History(false)
+	tm.Echo(false)
+	return tm.getInput()
 }
