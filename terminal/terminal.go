@@ -1,4 +1,4 @@
-package input
+package terminal
 
 import (
 	"fmt"
@@ -364,6 +364,7 @@ func (tm *Terminal) getInput() string {
 				fmt.Printf("*")
 			}
 			tm.cursorY++
+			tm.addXY(0, len(rightCmd))
 			if len(rightCmd) != 0 {
 				tm.cursorMoveLeft(len(rightCmd))
 			}
@@ -377,6 +378,9 @@ func (tm *Terminal) getInput() string {
 			if len(tm.historyList) == 0 {
 				tm.historyList = append(tm.historyList, strings.Trim(string(cmd), " "))
 			} else if tm.historyList[len(tm.historyList)-1] != strings.Trim(string(cmd), " ") {
+				if len(tm.historyList) >= SYS_MAX_HISTORY {
+					tm.historyList = tm.historyList[1:]
+				}
 				tm.historyList = append(tm.historyList, strings.Trim(string(cmd), " "))
 			}
 		}

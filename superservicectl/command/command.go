@@ -1,6 +1,7 @@
 package command
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -40,12 +41,28 @@ const (
 	LOCAL_CMD_CONNECT    = "CONNECT"
 	LOCAL_CMD_DISCONNECT = "DISCONNECT"
 	LOCAL_CMD_RELEASE    = "RELEASE"
+	LOCAL_CMD_EXIT       = "EXIT"
+	SERVICE_CMD_LIST     = "LIST"
+	SERVICE_CMD_START    = "START"
+	SERVICE_CMD_STOP     = "STOP"
+	SERVICE_CMD_RESTART  = "RESTART"
+	SERVICE_CMD_DELETE   = "DELETE"
+	SERVICE_CMD_UPDATE   = "UPDATE"
+	SERVICE_CMD_ADD      = "ADD"
 )
 
 var connectMachineList service.Machines
 
+var CommandList []string
+
+type Cmd struct {
+	Type string `json: "Type"`
+	service.Service
+}
+
 func init() {
 	connectMachineList = make(map[string]*service.Machine)
+	CommandList = []string{"hosts", "services", "connects", "connect", "disconnect", "release", "list", "start", "stop", "restart", "delete", "update", "add", "log", "exit"}
 }
 func KeepConnection() {
 	for _, v := range service.MachineList {
@@ -74,7 +91,7 @@ func KeepConnection() {
 
 func DealCommand(cmd string) {
 	cmds := strings.Fields(cmd)
-	if len(cmds) < 0 {
+	if len(cmds) <= 0 {
 		return
 	}
 	switch strings.ToUpper(cmds[0]) {
@@ -90,11 +107,25 @@ func DealCommand(cmd string) {
 	case LOCAL_CMD_CONNECT:
 		var tmpcmds []string
 		tmpcmds = append(tmpcmds, cmds[1:]...)
+		if len(tmpcmds) <= 0 {
+			fmt.Println("ERROR: command 'connect' nead hostname as parameter but not found.")
+			break
+		}
+		if strings.ToLower(tmpcmds[0]) == "all" {
+			tmpcmds = service.MachineList.GetAllMachines()
+		}
 		connect(tmpcmds...)
 		break
 	case LOCAL_CMD_DISCONNECT:
 		var tmpcmds []string
 		tmpcmds = append(tmpcmds, cmds[1:]...)
+		if len(tmpcmds) <= 0 {
+			fmt.Println("ERROR: command 'disconnect' nead hostname as parameter but not found.")
+			break
+		}
+		if strings.ToLower(tmpcmds[0]) == "all" {
+			tmpcmds = connectMachineList.GetAllMachines()
+		}
 		disconnect(tmpcmds...)
 		break
 	case LOCAL_CMD_RELEASE:
@@ -197,6 +228,9 @@ func showConnects() {
 
 func connect(machines ...string) {
 	for _, m := range machines {
+		if _, ok := connectMachineList[m]; ok {
+			fmt.Printf("WARNING: host '%s' already connected.", m)
+		}
 		if v, ok := service.MachineList[m]; ok {
 			go func() {
 				errcount := 0
@@ -211,6 +245,7 @@ func connect(machines ...string) {
 					}
 					if v.Ls.Status == longsocket.STATUS_INIT {
 						if errcount >= 2 {
+							delete(connectMachineList, m)
 							return
 						}
 						time.Sleep(2 * time.Second)
@@ -258,7 +293,38 @@ func disconnect(machines ...string) {
 	}
 }
 
-func sendCommand(cmd string) {}
+func sendCommand(cmd string) {
+	cmds := strings.Fields(cmd)
+	if len(cmds) != 2 {
+		fmt.Printf("ERROR:command '%s' need one servicename as parameter only.\n", cmds[0])
+	}
+	for _, v := range connectMachineList {
+		for _, s := range v.ServiceList {
+			if s.Name == cmds[1] {
+				var cmdMsg Cmd
+				cmdMsg.Type = cmds[0]
+				cmdMsg.Name = s.Name
+				cmdMsg.Command = s.Command
+				cmdMsg.Directory = s.Directory
+				cmdMsg.User = s.User
+				cmdMsg.AutoStart = s.AutoStart
+				cmdMsg.AutoRestart = s.AutoRestart
+
+				msg, err := json.Marshal(cmdMsg)
+				if err != nil {
+					fmt.Println("ERROR:", err)
+					break
+				}
+				err = v.Ls.Write(msg)
+				if err != nil {
+					fmt.Println("ERROR:", err)
+				}
+				break
+			}
+		}
+	}
+
+}
 
 func main() {
 	fmt.Println("test")

@@ -1,23 +1,24 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
 
 	"qianno.xie/superservice/superservicectl/command"
+	"qianno.xie/superservice/terminal"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
+	superterm := terminal.NewTerminal("> ")
+	superterm.SetSystemCommand(command.CommandList)
 	for {
 		fmt.Printf("> ")
-		cmd, _ := reader.ReadString('\n')
-		cmd = strings.Trim(cmd, "\n")
-
+		cmd := superterm.GetCommand()
+		fmt.Println()
 		if cmd == "" {
 			continue
+		}
+		if cmd == "exit" {
+			break
 		}
 		command.DealCommand(cmd)
 	}

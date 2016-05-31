@@ -69,6 +69,14 @@ func initMachineList(cfg *Machines_conf) {
 	}
 }
 
+func (m Machines) GetAllMachines() []string {
+	var res []string
+	for k, _ := range m {
+		res = append(res, k)
+	}
+	return res
+}
+
 func main() {
 	fmt.Println("test")
 }

@@ -216,7 +216,6 @@ func (svc *Service) Start(msg chan string) {
 		msg <- MSG_OK(svc.Name)
 		err = svc.cmd.Wait()
 		svc.status = STOP
-		svc.cmd.Process.Release()
 		if err != nil && svc.killSelf == false {
 			msg <- MSG_ERROR(err)
 			return

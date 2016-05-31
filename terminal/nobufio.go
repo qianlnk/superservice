@@ -1,4 +1,4 @@
-package input
+package terminal
 
 import (
 	//"fmt"
@@ -7,17 +7,6 @@ import (
 	"syscall"
 	"unsafe"
 )
-
-type syscall_Termios struct {
-	Iflag     uint64
-	Oflag     uint64
-	Cflag     uint64
-	Lflag     uint64
-	Cc        [20]uint8
-	Pad_cgo_0 [4]byte
-	Ispeed    uint64
-	Ospeed    uint64
-}
 
 const (
 	SYS_UP = 1000 + iota

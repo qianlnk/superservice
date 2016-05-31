@@ -1,6 +1,7 @@
 package command
 
 import (
+	"encoding/json"
 	"fmt"
 	//"net/http"
 	"net/url"
@@ -28,10 +29,10 @@ type Cmd struct {
 	service.Service
 }
 
-func dealCommand(cmd Cmd) {
+func dealCommand(cmd Cmd, ws *websocket.Conn) {
 	fmt.Println(cmd)
 	message := make(chan string)
-	go sendMessage(message)
+	go sendMessage(message, ws)
 	switch strings.ToUpper(cmd.Type) {
 	case "ADD":
 		service.ServiceList.UpdateService(cmd.Name, cmd.Command, cmd.Directory, cmd.User, cmd.AutoStart, cmd.AutoRestart, message)
@@ -61,12 +62,18 @@ func dealCommand(cmd Cmd) {
 	}
 }
 
-func dealMsg(msg []byte) error {
+func dealMsg(msg []byte, ws *websocket.Conn) error {
 	fmt.Println("dealMsg", string(msg))
+	if string(msg) == longsocket.SHAKE_HANDS_MSG || len(msg) == 0 {
+		return nil
+	}
+	var cmd Cmd
+	json.Unmarshal(msg, &cmd)
+	dealCommand(cmd, ws)
 	return nil
 }
 
-func sendMessage(msg chan string) {
+func sendMessage(msg chan string, ws *websocket.Conn) {
 	fmt.Println("sendMessage")
 	for {
 		select {
@@ -74,6 +81,7 @@ func sendMessage(msg chan string) {
 			if !ok {
 				return
 			}
+			ws.Write([]byte(m))
 			fmt.Println(m)
 		}
 	}
