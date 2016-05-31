@@ -3,7 +3,6 @@ package longsocket
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -117,7 +116,7 @@ func (l *Longsocket) Close() {
 func (l *Longsocket) WriteLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println("writeloop", err)
+			//fmt.Println("writeloop", err)
 		}
 	}()
 
@@ -163,7 +162,7 @@ func (l *Longsocket) Write(buf []byte) error {
 func (l *Longsocket) ReadLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println("readloop", err)
+			//fmt.Println("readloop", err)
 		}
 	}()
 
@@ -186,7 +185,7 @@ func (l *Longsocket) ReadLoop() {
 	l.Close()
 }
 
-type dealmsg func([]byte) error
+type dealmsg func([]byte, *websocket.Conn) error
 
 func (l *Longsocket) Read(f dealmsg) {
 	for {
@@ -197,7 +196,7 @@ func (l *Longsocket) Read(f dealmsg) {
 		select {
 		case msg := <-l.readCh:
 			{
-				err := f(msg)
+				err := f(msg, l.Ws)
 				if err != nil {
 					l.Write([]byte(err.Error()))
 				}
