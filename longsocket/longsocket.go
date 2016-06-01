@@ -27,7 +27,6 @@ type Longsocket struct {
 	Ws         *websocket.Conn
 	writeCh    chan []byte
 	readCh     chan []byte
-	ReadBuf    []byte
 	ShakeHand  bool
 	Url        string
 	Protocol   string
@@ -42,7 +41,6 @@ func NewConn(url, protocol, origin string, shankhand bool, buffersize int) *Long
 		Ws:         nil,
 		writeCh:    make(chan []byte),
 		readCh:     make(chan []byte),
-		ReadBuf:    make([]byte, buffersize),
 		ShakeHand:  shankhand,
 		Url:        url,
 		Protocol:   protocol,
@@ -170,22 +168,20 @@ func (l *Longsocket) ReadLoop() {
 		if l.Status != STATUS_CONNECT {
 			break
 		}
-
-		n, err := l.Ws.Read(l.ReadBuf)
-		//fmt.Println("n = ", n, "l.ReadBuf = ", l.ReadBuf, err)
+		buf := make([]byte, l.BufferSize)
+		n, err := l.Ws.Read(buf)
 		if err != nil {
 			break
 		}
-		//fmt.Println("n = ", n, "l.ReadBuf = ", l.ReadBuf)
-		//&& string(l.ReadBuf[0:n]) != SHAKE_HANDS_MSG
+
 		if n > 0 {
-			l.readCh <- l.ReadBuf[0:n]
+			l.readCh <- buf[0:n]
 		}
 	}
 	l.Close()
 }
 
-type dealmsg func([]byte, *websocket.Conn) error
+type dealmsg func([]byte, *Longsocket) error
 
 func (l *Longsocket) Read(f dealmsg) {
 	for {
@@ -196,7 +192,7 @@ func (l *Longsocket) Read(f dealmsg) {
 		select {
 		case msg := <-l.readCh:
 			{
-				err := f(msg, l.Ws)
+				err := f(msg, l)
 				if err != nil {
 					l.Write([]byte(err.Error()))
 				}

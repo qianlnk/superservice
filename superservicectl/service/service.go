@@ -45,6 +45,10 @@ func init() {
 	}
 }
 
+func GetServiceMachineList() Machines {
+	return MachineList
+}
+
 //函数功能：读取配置文件
 func config() (*Machines_conf, error) {
 	var cfg Machines_conf

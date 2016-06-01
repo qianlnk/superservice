@@ -29,10 +29,11 @@ type Cmd struct {
 	service.Service
 }
 
-func dealCommand(cmd Cmd, ws *websocket.Conn) {
+func dealCommand(cmd Cmd, l *longsocket.Longsocket) {
 	fmt.Println(cmd)
-	message := make(chan string)
-	go sendMessage(message, ws)
+	message := make(chan string, 1)
+	//defer close(message)
+	go sendMessage(message, l)
 	switch strings.ToUpper(cmd.Type) {
 	case "ADD":
 		service.ServiceList.UpdateService(cmd.Name, cmd.Command, cmd.Directory, cmd.User, cmd.AutoStart, cmd.AutoRestart, message)
@@ -62,18 +63,18 @@ func dealCommand(cmd Cmd, ws *websocket.Conn) {
 	}
 }
 
-func dealMsg(msg []byte, ws *websocket.Conn) error {
+func dealMsg(msg []byte, l *longsocket.Longsocket) error {
 	fmt.Println("dealMsg", string(msg))
 	if string(msg) == longsocket.SHAKE_HANDS_MSG || len(msg) == 0 {
 		return nil
 	}
 	var cmd Cmd
 	json.Unmarshal(msg, &cmd)
-	dealCommand(cmd, ws)
+	dealCommand(cmd, l)
 	return nil
 }
 
-func sendMessage(msg chan string, ws *websocket.Conn) {
+func sendMessage(msg chan string, l *longsocket.Longsocket) {
 	fmt.Println("sendMessage")
 	for {
 		select {
@@ -81,7 +82,7 @@ func sendMessage(msg chan string, ws *websocket.Conn) {
 			if !ok {
 				return
 			}
-			ws.Write([]byte(m))
+			l.Write([]byte(m))
 			fmt.Println(m)
 		}
 	}

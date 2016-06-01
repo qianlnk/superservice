@@ -1,8 +1,14 @@
 package command
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"mime/multipart"
+	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -51,8 +57,6 @@ const (
 	SERVICE_CMD_ADD      = "ADD"
 )
 
-var connectMachineList service.Machines
-
 var CommandList []string
 
 type Cmd struct {
@@ -60,33 +64,18 @@ type Cmd struct {
 	service.Service
 }
 
-func init() {
-	connectMachineList = make(map[string]*service.Machine)
-	CommandList = []string{"hosts", "services", "connects", "connect", "disconnect", "release", "list", "start", "stop", "restart", "delete", "update", "add", "log", "exit"}
+type Command struct {
+	ConnectMachineList service.Machines
+	ServiceMachineList service.Machines
 }
-func KeepConnection() {
-	for _, v := range service.MachineList {
-		fmt.Println(v)
-		go func() {
-			for {
-				wsAddr := fmt.Sprintf("ws://%s:%s/Cmd", v.Host, v.Port)
-				httpAddr := fmt.Sprintf("http://%s:%s/Cmd?user=%s&password=%s", v.Host, v.Port, "qianlnk", "123456")
-				v.Ls = longsocket.NewConn(wsAddr, "", httpAddr, true, 128*1024)
-				err := v.Ls.Dial(true)
-				if err != nil {
-					fmt.Println(err)
-				}
-				fmt.Println(123)
-				go v.Ls.ReadLoop()
-				go v.Ls.WriteLoop()
-				<-v.CloseConn
-				v.Ls.Close()
-			}
-		}()
-	}
-	for {
-		time.Sleep(2 * time.Second)
-	}
+
+var ctlCommand *Command
+
+func init() {
+	ctlCommand = new(Command)
+	ctlCommand.ConnectMachineList = make(map[string]*service.Machine)
+	ctlCommand.ServiceMachineList = service.GetServiceMachineList()
+	CommandList = []string{"hosts", "services", "connects", "connect", "disconnect", "release", "list", "start", "stop", "restart", "delete", "update", "add", "log", "exit"}
 }
 
 func DealCommand(cmd string) {
@@ -96,13 +85,13 @@ func DealCommand(cmd string) {
 	}
 	switch strings.ToUpper(cmds[0]) {
 	case LOCAL_CMD_HOSTS:
-		showHosts()
+		ctlCommand.showHosts()
 		break
 	case LOCAL_CMD_SERVICES:
-		showServices()
+		ctlCommand.showServices()
 		break
 	case LOCAL_CMD_CONNECTS:
-		showConnects()
+		ctlCommand.showConnects()
 		break
 	case LOCAL_CMD_CONNECT:
 		var tmpcmds []string
@@ -114,7 +103,7 @@ func DealCommand(cmd string) {
 		if strings.ToLower(tmpcmds[0]) == "all" {
 			tmpcmds = service.MachineList.GetAllMachines()
 		}
-		connect(tmpcmds...)
+		ctlCommand.connect(tmpcmds...)
 		break
 	case LOCAL_CMD_DISCONNECT:
 		var tmpcmds []string
@@ -124,14 +113,15 @@ func DealCommand(cmd string) {
 			break
 		}
 		if strings.ToLower(tmpcmds[0]) == "all" {
-			tmpcmds = connectMachineList.GetAllMachines()
+			tmpcmds = ctlCommand.ConnectMachineList.GetAllMachines()
 		}
-		disconnect(tmpcmds...)
+		ctlCommand.disconnect(tmpcmds...)
 		break
 	case LOCAL_CMD_RELEASE:
+		ctlCommand.relaseVersion(cmds[1:]...)
 		break
 	default:
-		sendCommand(cmd)
+		ctlCommand.sendCommand(cmd)
 	}
 }
 func show(fields []string, datas [][]string) {
@@ -181,10 +171,10 @@ func show(fields []string, datas [][]string) {
 	}
 	fmt.Println(line)
 }
-func showHosts() {
+func (ctl *Command) showHosts() {
 	fields := []string{"name", "host", "port"}
 	var datas [][]string
-	for _, v := range service.MachineList {
+	for _, v := range ctl.ServiceMachineList {
 		var data []string
 		data = append(data, v.Name)
 		data = append(data, v.Host)
@@ -194,10 +184,10 @@ func showHosts() {
 	show(fields, datas)
 }
 
-func showServices() {
+func (ctl *Command) showServices() {
 	fields := []string{"hostname", "name", "command", "directory", "user", "autostart", "autorestart"}
 	var datas [][]string
-	for _, v := range service.MachineList {
+	for _, v := range ctl.ServiceMachineList {
 		for _, s := range v.ServiceList {
 			var data []string
 			data = append(data, v.Name)
@@ -213,10 +203,10 @@ func showServices() {
 	show(fields, datas)
 }
 
-func showConnects() {
+func (ctl *Command) showConnects() {
 	fields := []string{"name", "host", "port"}
 	var datas [][]string
-	for _, v := range connectMachineList {
+	for _, v := range ctl.ConnectMachineList {
 		var data []string
 		data = append(data, v.Name)
 		data = append(data, v.Host)
@@ -226,12 +216,91 @@ func showConnects() {
 	show(fields, datas)
 }
 
-func connect(machines ...string) {
+func postFile(fileName string, targetUrl string) error {
+	bodyBuf := &bytes.Buffer{}
+	bodyWriter := multipart.NewWriter(bodyBuf)
+
+	fileWriter, err := bodyWriter.CreateFormFile("releasefile", fileName)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(fileWriter, f)
+	if err != nil {
+		return err
+	}
+
+	contentType := bodyWriter.FormDataContentType()
+	bodyWriter.Close()
+
+	resp, err := http.Post(targetUrl, contentType, bodyBuf)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	resp_body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Status)
+	fmt.Println(string(resp_body))
+	return nil
+}
+
+func (ctl *Command) relaseVersion(services ...string) {
+	for _, m := range ctl.ConnectMachineList {
+		targetUrl := fmt.Sprintf("http://%s:%s/Release", m.Host, m.Port)
+		for _, s := range m.ServiceList {
+			for _, sn := range services {
+				if s.Name == sn {
+					postFile(fmt.Sprintf("%s%s.tar", s.Directory, s.Name), targetUrl)
+				}
+			}
+		}
+	}
+}
+
+func (ctl *Command) showResMessage(msg []byte, l *longsocket.Longsocket) {
+	type list struct {
+		Host    string
+		Service string
+		Status  string
+		Pid     int
+		User    string
+		Command string
+	}
+	var resList list
+	err := json.Unmarshal(msg, &resList)
+	if err != nil {
+		for _, v := range ctl.ConnectMachineList {
+			if v.Ls == l {
+				fmt.Println(v.Name, ":", string(msg))
+				break
+			}
+		}
+	} else {
+		for _, v := range ctl.ConnectMachineList {
+			if v.Ls == l {
+				resList.Host = v.Name
+				break
+			}
+		}
+		fmt.Printf("host: %s\tservice:%s\t\t%s\t%d\t%s\t%s\n", resList.Host, resList.Service, resList.Status, resList.Pid, resList.User, resList.Command)
+	}
+
+}
+
+func (ctl *Command) connect(machines ...string) {
 	for _, m := range machines {
-		if _, ok := connectMachineList[m]; ok {
+		if _, ok := ctl.ConnectMachineList[m]; ok {
 			fmt.Printf("WARNING: host '%s' already connected.", m)
 		}
-		if v, ok := service.MachineList[m]; ok {
+		if v, ok := ctl.ServiceMachineList[m]; ok {
 			go func() {
 				errcount := 0
 				for {
@@ -245,18 +314,19 @@ func connect(machines ...string) {
 					}
 					if v.Ls.Status == longsocket.STATUS_INIT {
 						if errcount >= 2 {
-							delete(connectMachineList, m)
+							delete(ctl.ConnectMachineList, m)
 							return
 						}
 						time.Sleep(2 * time.Second)
 						continue
 					}
-					connectMachineList[m] = v
+					ctl.ConnectMachineList[m] = v
 
 					reConn := make(chan bool)
 					go func() {
 						go v.Ls.ReadLoop()
-						v.Ls.WriteLoop()
+						go v.Ls.WriteLoop()
+						v.Ls.Read(dealResMessage)
 						reConn <- false
 						return
 					}()
@@ -271,9 +341,9 @@ func connect(machines ...string) {
 					}
 				}
 			}()
-			if _, ok := connectMachineList[m]; !ok {
+			if _, ok := ctl.ConnectMachineList[m]; !ok {
 				time.Sleep(3 * time.Second)
-				if _, ok := connectMachineList[m]; !ok {
+				if _, ok := ctl.ConnectMachineList[m]; !ok {
 					fmt.Printf("host '%s' connection refused.\n", m)
 				}
 			}
@@ -283,22 +353,41 @@ func connect(machines ...string) {
 	}
 }
 
-func disconnect(machines ...string) {
+func (ctl *Command) disconnect(machines ...string) {
 	for _, m := range machines {
-		if v, ok := connectMachineList[m]; ok {
+		if v, ok := ctl.ConnectMachineList[m]; ok {
 			v.CloseConn <- true
 			time.Sleep(2 * time.Nanosecond)
-			delete(connectMachineList, m)
+			delete(ctl.ConnectMachineList, m)
 		}
 	}
 }
 
-func sendCommand(cmd string) {
+func (ctl *Command) sendCommand(cmd string) {
 	cmds := strings.Fields(cmd)
 	if len(cmds) != 2 {
 		fmt.Printf("ERROR:command '%s' need one servicename as parameter only.\n", cmds[0])
+		return
 	}
-	for _, v := range connectMachineList {
+	if strings.ToUpper(cmds[0]) == SERVICE_CMD_LIST {
+		for _, v := range ctl.ConnectMachineList {
+			if v.Name == cmds[1] || strings.ToLower(cmds[1]) == "all" {
+				var cmdMsg Cmd
+				cmdMsg.Type = cmds[0]
+				msg, err := json.Marshal(cmdMsg)
+				if err != nil {
+					fmt.Println("ERROR:", err)
+					continue
+				}
+				err = v.Ls.Write(msg)
+				if err != nil {
+					fmt.Println("ERROR:", err)
+				}
+			}
+		}
+		return
+	}
+	for _, v := range ctl.ConnectMachineList {
 		for _, s := range v.ServiceList {
 			if s.Name == cmds[1] {
 				var cmdMsg Cmd
@@ -326,6 +415,13 @@ func sendCommand(cmd string) {
 
 }
 
+func dealResMessage(msg []byte, l *longsocket.Longsocket) error {
+	if len(msg) == 0 {
+		return nil
+	}
+	ctlCommand.showResMessage(msg, l)
+	return nil
+}
 func main() {
 	fmt.Println("test")
 	DealCommand("hosts")
