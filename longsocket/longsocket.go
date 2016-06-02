@@ -111,6 +111,8 @@ func (l *Longsocket) Close() {
 	l.Status = STATUS_CLOSE
 }
 
+//call func with a gorouting, it will send shake hands message to service to make sure self is ok
+//if you want to send message call func 'Write', and the case writeCh will be vaild
 func (l *Longsocket) WriteLoop() {
 	defer func() {
 		if err := recover(); err != nil {
@@ -145,6 +147,7 @@ func (l *Longsocket) WriteLoop() {
 	l.Close()
 }
 
+//send message to socket
 func (l *Longsocket) Write(buf []byte) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -157,6 +160,7 @@ func (l *Longsocket) Write(buf []byte) error {
 	}
 }
 
+//read message form socket and write them to readCh
 func (l *Longsocket) ReadLoop() {
 	defer func() {
 		if err := recover(); err != nil {
@@ -183,6 +187,7 @@ func (l *Longsocket) ReadLoop() {
 
 type dealmsg func([]byte, *Longsocket) error
 
+//select socket message and do something in func like 'dealmsg'
 func (l *Longsocket) Read(f dealmsg) {
 	for {
 		if l.Status != STATUS_CONNECT {

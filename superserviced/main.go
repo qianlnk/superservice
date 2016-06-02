@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"net/http"
-	"os/user"
+	//"os/user"
 	"time"
 
 	"github.com/golang/glog"
@@ -30,31 +30,15 @@ func main() {
 	defer ticker.Stop()
 	flag.Parse()
 
-	selfuser, err := user.Current()
-	if err != nil {
-		glog.Errorf("get user info err: %s", err.Error())
-	}
-	if selfuser.Username != "root" {
-		glog.Errorf("superservice request to run as root.")
-		return
-	}
+	//	selfuser, err := user.Current()
+	//	if err != nil {
+	//		glog.Errorf("get user info err: %s", err.Error())
+	//	}
+	//	if selfuser.Username != "root" {
+	//		glog.Errorf("superservice request to run as root.")
+	//		return
+	//	}
 
-	//	err = service.ServiceList.UpdateService("lnk", "./hello/hello lnk", "", "root", true, true)
-	//	if err != nil {
-	//		glog.Errorf("update service err: %s", err.Error())
-	//	}
-	//	time.Sleep(time.Second * 5)
-	//	err = service.ServiceList.UpdateService("lnk", "./hello/hello newlnk", "", "root", true, true)
-	//	if err != nil {
-	//		glog.Errorf("update service err: %s", err.Error())
-	//	}
-	//	err = service.ServiceList.UpdateService("xzj", "./hello/hello xzj", "", "xiezhenjia", true, true)
-	//	if err != nil {
-	//		glog.Errorf("update service err: %s", err.Error())
-	//	}
-	//	for {
-	//		time.Sleep(1 * time.Minute)
-	//	}
 	http.Handle("/Cmd", websocket.Handler(command.CmdHandle))
 	http.HandleFunc("/Release", release.ReleaseHandle)
 
@@ -62,13 +46,13 @@ func main() {
 	srv := &http.Server{
 		Addr:           ":5260",
 		Handler:        nil,
-		ReadTimeout:    time.Duration(30) * time.Second,
-		WriteTimeout:   time.Duration(30) * time.Second,
+		ReadTimeout:    time.Duration(5) * time.Minute,
+		WriteTimeout:   time.Duration(5) * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 
 	// start listen
-	err = srv.ListenAndServe()
+	err := srv.ListenAndServe()
 	if err != nil {
 		glog.Errorf("ERROR:main listen and serve failed!err:%+v", err)
 		return

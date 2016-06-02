@@ -185,13 +185,14 @@ func (ctl *Command) showHosts() {
 }
 
 func (ctl *Command) showServices() {
-	fields := []string{"hostname", "name", "command", "directory", "user", "autostart", "autorestart"}
+	fields := []string{"hostname", "name", "version", "command", "directory", "user", "autostart", "autorestart"}
 	var datas [][]string
 	for _, v := range ctl.ServiceMachineList {
 		for _, s := range v.ServiceList {
 			var data []string
 			data = append(data, v.Name)
 			data = append(data, s.Name)
+			data = append(data, s.Version)
 			data = append(data, s.Command)
 			data = append(data, s.Directory)
 			data = append(data, s.User)
@@ -258,7 +259,10 @@ func (ctl *Command) relaseVersion(services ...string) {
 		for _, s := range m.ServiceList {
 			for _, sn := range services {
 				if s.Name == sn {
-					postFile(fmt.Sprintf("%s%s.tar", s.Directory, s.Name), targetUrl)
+					err := postFile(fmt.Sprintf("%s/%s.tar", s.Directory, s.Name), targetUrl)
+					if err != nil {
+						fmt.Println("err = ", err)
+					}
 				}
 			}
 		}

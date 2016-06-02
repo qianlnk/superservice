@@ -7,20 +7,45 @@
 			"ServiceList":[
 				{
 					"Name": "helloLnk",
+					"Version": "0.1.0",
 					"Command": "./hello/hello lnk",
-					"Directory": "/user/local/hello",
+					"Directory": "/usr/local/hello",
 					"User": "root",
 					"AutoStart": true,
 					"AutoRestart": true
 				},{
 					"Name": "helloXzj",
+					"Version": "0.1.1",
 					"Command": "./hello/hello xzj",
-					"Directory": "/user/local/hello",
+					"Directory": "/usr/local/hello",
 					"User": "xiezhenjia",
 					"AutoStart": true,
 					"AutoRestart": true
 				}
 			]	
+		},{
+			"Name": "17cetest",
+			"Host": "203.156.197.47",
+			"Port": "5260",
+			"ServiceList": [
+				{
+					"Name": "helloTest",
+					"Version": "0.1.0",
+					"Command": "./hello/hello test",
+					"Directory": "/usr/local/hello",
+					"User": "root",
+					"AutoStart": false,
+					"AutoRestart": false
+				},{
+					"Name": "helloCeCe",
+					"Version": "0.1.0",
+					"Command": "./hello/hello cece",
+					"Directory": "/usr/local/hello",
+					"User": "root",
+					"AutoStart": false,
+					"AutoRestart": false
+				}
+			]
 		}
 	]
 }

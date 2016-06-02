@@ -9,6 +9,7 @@ import (
 
 type Service struct {
 	Name        string `json:"Name"`
+	Version     string `json: "Version"`
 	Command     string `json:"Command"`
 	Directory   string `json:"Directory"`
 	User        string `json:"User"`
@@ -40,9 +41,9 @@ func init() {
 		return
 	}
 	initMachineList(cfg)
-	for k, v := range MachineList {
-		fmt.Println(k, v.Host, v.Port, v.ServiceList)
-	}
+	//	for k, v := range MachineList {
+	//		fmt.Println(k, v.Host, v.Port, v.ServiceList)
+	//	}
 }
 
 func GetServiceMachineList() Machines {
@@ -68,8 +69,15 @@ func config() (*Machines_conf, error) {
 func initMachineList(cfg *Machines_conf) {
 	MachineList = make(map[string]*Machine)
 	for _, v := range cfg.MachineList {
-		v.CloseConn = make(chan bool)
-		MachineList[v.Name] = &v
+		machine := &Machine{
+			Name:        v.Name,
+			Host:        v.Host,
+			Port:        v.Port,
+			ServiceList: v.ServiceList,
+			Ls:          v.Ls,
+			CloseConn:   make(chan bool),
+		}
+		MachineList[v.Name] = machine
 	}
 }
 

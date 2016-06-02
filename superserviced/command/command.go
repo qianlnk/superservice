@@ -29,6 +29,7 @@ type Cmd struct {
 	service.Service
 }
 
+//exec command
 func dealCommand(cmd Cmd, l *longsocket.Longsocket) {
 	fmt.Println(cmd)
 	message := make(chan string, 1)
@@ -36,13 +37,13 @@ func dealCommand(cmd Cmd, l *longsocket.Longsocket) {
 	go sendMessage(message, l)
 	switch strings.ToUpper(cmd.Type) {
 	case "ADD":
-		service.ServiceList.UpdateService(cmd.Name, cmd.Command, cmd.Directory, cmd.User, cmd.AutoStart, cmd.AutoRestart, message)
+		service.ServiceList.UpdateService(cmd.Name, cmd.Version, cmd.Command, cmd.Directory, cmd.User, cmd.AutoStart, cmd.AutoRestart, message)
 		break
 	case "DELETE":
 		service.ServiceList.Delete(cmd.Name, message)
 		break
 	case "UPDATE":
-		service.ServiceList.UpdateService(cmd.Name, cmd.Command, cmd.Directory, cmd.User, cmd.AutoStart, cmd.AutoRestart, message)
+		service.ServiceList.UpdateService(cmd.Name, cmd.Version, cmd.Command, cmd.Directory, cmd.User, cmd.AutoStart, cmd.AutoRestart, message)
 		break
 	case "LIST":
 		service.ServiceList.List(message)
@@ -63,6 +64,7 @@ func dealCommand(cmd Cmd, l *longsocket.Longsocket) {
 	}
 }
 
+//deal the message for super service control client
 func dealMsg(msg []byte, l *longsocket.Longsocket) error {
 	fmt.Println("dealMsg", string(msg))
 	if string(msg) == longsocket.SHAKE_HANDS_MSG || len(msg) == 0 {
@@ -74,6 +76,7 @@ func dealMsg(msg []byte, l *longsocket.Longsocket) error {
 	return nil
 }
 
+//call func with gorouting, it will send result message to client
 func sendMessage(msg chan string, l *longsocket.Longsocket) {
 	fmt.Println("sendMessage")
 	for {
@@ -88,11 +91,13 @@ func sendMessage(msg chan string, l *longsocket.Longsocket) {
 	}
 }
 
+//check user and password
 func Verify(user, password string) bool {
 	fmt.Println(user, password)
 	return true
 }
 
+//accept connect for client
 func CmdHandle(ws *websocket.Conn) {
 	req := ws.Request()
 	u, err := url.Parse(req.Header.Get("Origin"))

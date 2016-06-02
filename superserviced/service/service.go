@@ -15,6 +15,7 @@ import (
 
 type Service struct {
 	Name        string
+	Version     string
 	Command     string
 	Directory   string
 	User        string
@@ -79,9 +80,10 @@ func init() {
 	go ServiceList.AotoRestart()
 }
 
-func newService(name, command, dir, username string, start, restart bool) *Service {
+func newService(name, version, command, dir, username string, start, restart bool) *Service {
 	return &Service{
 		Name:        name,
+		Version:     version,
 		Command:     command,
 		Directory:   dir,
 		User:        username,
@@ -93,11 +95,11 @@ func newService(name, command, dir, username string, start, restart bool) *Servi
 		killSelf:    false,
 	}
 }
-func (svclst Services) UpdateService(name, command, dir, user string, start, restart bool, msg chan string) {
+func (svclst Services) UpdateService(name, version, command, dir, user string, start, restart bool, msg chan string) {
 	runbefore := false
 	if v, ok := svclst[name]; ok {
 		msg <- MSG_UPDATE(name)
-		if v.Command != command || v.Directory != dir || v.User != user || v.AutoStart != start || v.AutoRestart != restart {
+		if v.Version != version || v.Command != command || v.Directory != dir || v.User != user || v.AutoStart != start || v.AutoRestart != restart {
 			if v.status == RUNNING {
 				runbefore = true
 				err := svclst[name].Stop(msg)
@@ -105,14 +107,14 @@ func (svclst Services) UpdateService(name, command, dir, user string, start, res
 					return
 				}
 			}
-			svclst[name] = newService(name, command, dir, user, start, restart)
+			svclst[name] = newService(name, version, command, dir, user, start, restart)
 			msg <- MSG_OK(name)
 		} else {
 			msg <- MSG_NO_CHANGE(name)
 		}
 	} else {
 		msg <- MSG_ADD(name)
-		svclst[name] = newService(name, command, dir, user, start, restart)
+		svclst[name] = newService(name, version, command, dir, user, start, restart)
 		msg <- MSG_OK(name)
 	}
 
@@ -171,8 +173,14 @@ func (svclst Services) Delete(serviceName string, msg chan string) {
 func (svclst Services) List(msg chan string) {
 	for _, v := range svclst {
 		//{"Name":"xzj","Command":"./hello/hello xzj","Directory":"","User":"xiezhenjia","AutoStart":true,"AutoRestart":true}
-		tmpmsg := fmt.Sprintf("{\"Service\":\"%s\",\"Status\":\"%s\",\"Pid\":%d,\"User\":\"%s\", \"Command\":\"%s\"}",
-			v.Name, v.status, v.cmd.Process.Pid, v.User, v.Command)
+		var tmpmsg string
+		if v.status == RUNNING {
+			tmpmsg = fmt.Sprintf("{\"Service\":\"%s\",\"Status\":\"%s\",\"Pid\":%d,\"User\":\"%s\", \"Command\":\"%s\"}",
+				v.Name, v.status, v.cmd.Process.Pid, v.User, v.Command)
+		} else {
+			tmpmsg = fmt.Sprintf("{\"Service\":\"%s\",\"Status\":\"%s\",\"Pid\":%d,\"User\":\"%s\", \"Command\":\"%s\"}",
+				v.Name, v.status, 0, v.User, v.Command)
+		}
 		msg <- string(tmpmsg)
 	}
 }
