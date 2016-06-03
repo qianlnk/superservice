@@ -142,12 +142,20 @@ func show(fields []string, datas [][]string) {
 		}
 	}
 	line := "+"
-	for _, v := range maxlen {
-		for i := 0; i <= v; i++ {
-			line += "-"
+	for i := 0; i < len(maxlen); i++ {
+		if _, ok := maxlen[i]; ok {
+			for j := 0; j <= maxlen[i]; j++ {
+				line += "-"
+			}
 		}
 		line += "+"
 	}
+	//	for _, v := range maxlen {
+	//		for i := 0; i <= v; i++ {
+	//			line += "-"
+	//		}
+	//		line += "+"
+	//	}
 	if line == "+" {
 		return
 	}
