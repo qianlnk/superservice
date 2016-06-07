@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"qianno.xie/superservice/longsocket"
+	"qianno.xie/longsocket"
 	"qianno.xie/superservice/superservicectl/service"
 )
 

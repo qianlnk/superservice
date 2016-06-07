@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"qianno.xie/superservice/longsocket"
+	"qianno.xie/longsocket"
 	"qianno.xie/superservice/superserviced/service"
 )
 

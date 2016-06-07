@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"qianno.xie/superservice/superservicectl/command"
-	"qianno.xie/superservice/terminal"
+	"qianno.xie/terminal"
 )
 
 func main() {

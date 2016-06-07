@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"qianno.xie/superservice/longsocket"
+	"qianno.xie/longsocket"
 )
 
 type Service struct {
