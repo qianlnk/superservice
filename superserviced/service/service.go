@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"qianno.xie/superservice/superserviced/storage"
 )
 
 type Service struct {
@@ -77,6 +80,7 @@ func MSG_EXIT(funcname string) string {
 }
 func init() {
 	ServiceList = make(map[string]*Service)
+	ServiceList.ReadStorage()
 	go ServiceList.AotoRestart()
 }
 
@@ -95,7 +99,27 @@ func newService(name, version, command, dir, username string, start, restart boo
 		killSelf:    false,
 	}
 }
+func (svclst Services) ReadStorage() {
+	bolt := storage.GetBolt("service")
+	kvs, err := bolt.List()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	msg := make(chan string)
+	go discardMsg(msg)
+	for _, v := range kvs {
+		var service Service
+		err := json.Unmarshal(v.Value, &service)
+		if err != nil {
+			continue
+		}
+		svclst.UpdateService(service.Name, service.Version, service.Command, service.Directory, service.User, service.AutoStart, service.AutoRestart, msg)
+	}
+}
+
 func (svclst Services) UpdateService(name, version, command, dir, user string, start, restart bool, msg chan string) {
+	bolt := storage.GetBolt("service")
 	runbefore := false
 	if v, ok := svclst[name]; ok {
 		msg <- MSG_UPDATE(name)
@@ -108,6 +132,7 @@ func (svclst Services) UpdateService(name, version, command, dir, user string, s
 				}
 			}
 			svclst[name] = newService(name, version, command, dir, user, start, restart)
+			bolt.Update(name, *svclst[name])
 			msg <- MSG_OK(name)
 		} else {
 			msg <- MSG_NO_CHANGE(name)
@@ -115,6 +140,7 @@ func (svclst Services) UpdateService(name, version, command, dir, user string, s
 	} else {
 		msg <- MSG_ADD(name)
 		svclst[name] = newService(name, version, command, dir, user, start, restart)
+		bolt.Put(name, *svclst[name])
 		msg <- MSG_OK(name)
 	}
 
@@ -162,12 +188,17 @@ func (svclst Services) Close() {
 
 func (svclst Services) Delete(serviceName string, msg chan string) {
 	if _, ok := svclst[serviceName]; ok {
+		bolt := storage.GetBolt("service")
+		msg <- MSG_DELETE(serviceName)
 		err := svclst[serviceName].Stop(msg)
 		if err != nil {
 			return
 		}
 		svclst[serviceName] = nil
 		delete(svclst, serviceName)
+		bolt.Delete(serviceName)
+		msg <- MSG_OK(serviceName)
+
 	}
 }
 func (svclst Services) List(msg chan string) {
