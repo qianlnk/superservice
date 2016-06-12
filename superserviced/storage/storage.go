@@ -143,3 +143,7 @@ func (b *Bolt) List() (kvs []*KeyValue, err error) {
 	})
 	return kvs, err
 }
+
+func (b *Bolt) Close() {
+	b.db.Close()
+}

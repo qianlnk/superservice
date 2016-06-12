@@ -14,6 +14,7 @@ type User struct {
 
 func Add(name, password string) error {
 	bolt := storage.GetBolt("user")
+	defer bolt.Close()
 	user := User{
 		Name:     name,
 		Password: password,
@@ -21,8 +22,15 @@ func Add(name, password string) error {
 	return bolt.Put(name, user)
 }
 
+func Delete(name string) error {
+	bolt := storage.GetBolt("user")
+	defer bolt.Close()
+	return bolt.Delete(name)
+}
+
 func Update(name, password string) error {
 	bolt := storage.GetBolt("user")
+	defer bolt.Close()
 	user := User{
 		Name:     name,
 		Password: password,
@@ -32,6 +40,7 @@ func Update(name, password string) error {
 
 func Verify(name, password string) (bool, error) {
 	bolt := storage.GetBolt("user")
+	defer bolt.Close()
 	kv, err := bolt.Get(name)
 	if err != nil {
 		return false, err

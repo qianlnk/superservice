@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -225,16 +226,16 @@ func (ctl *Command) showConnects() {
 	show(fields, datas)
 }
 
-func postFile(fileName string, targetUrl string) error {
+func postFile(file, fileName string, targetUrl string) error {
 	bodyBuf := &bytes.Buffer{}
 	bodyWriter := multipart.NewWriter(bodyBuf)
 
-	fileWriter, err := bodyWriter.CreateFormFile("releasefile", fileName)
+	fileWriter, err := bodyWriter.CreateFormFile(fileName, file)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.Open(fileName)
+	f, err := os.Open(file)
 	if err != nil {
 		return err
 	}
@@ -261,16 +262,54 @@ func postFile(fileName string, targetUrl string) error {
 	return nil
 }
 
+func compressFile(s service.Service) error {
+	cmd := exec.Command("tar", "cvzf", fmt.Sprintf("%s%s.tar.gz", s.Name, s.Version), "-C", "/Users/xiezhenjia/go/src/qianno.xie/superservice/superservicectl/programs", s.Name)
+	what, err := cmd.Output()
+	if err != nil {
+		fmt.Println("1 ", err, string(what))
+		return err
+	}
+	err = cmd.Start()
+	if err != nil {
+		fmt.Println("2 ", err)
+		return err
+	}
+	return cmd.Wait()
+}
+
+func removeCompressFile(s service.Service) error {
+	cmd := exec.Command("rm", "-f", fmt.Sprintf("%s%s.tar.gz", s.Name, s.Version))
+	_, err := cmd.Output()
+	if err != nil {
+		fmt.Println("1 ", err)
+		return err
+	}
+	err = cmd.Start()
+	if err != nil {
+		fmt.Println("2 ", err)
+		return err
+	}
+	return cmd.Wait()
+}
+
 func (ctl *Command) relaseVersion(services ...string) {
 	for _, m := range ctl.ConnectMachineList {
-		targetUrl := fmt.Sprintf("http://%s:%s/Release", m.Host, m.Port)
 		for _, s := range m.ServiceList {
 			for _, sn := range services {
 				if s.Name == sn {
-					err := postFile(fmt.Sprintf("%s/%s.tar", s.Directory, s.Name), targetUrl)
+					targetUrl := fmt.Sprintf("http://%s:%s/Release?user=%s&password=%s&file=%s&filename=%s", m.Host, m.Port, "qianlnk", "123456", fmt.Sprintf("%s%s.tar.gz", s.Name, s.Version), sn)
+					err := compressFile(s)
 					if err != nil {
-						fmt.Println("err = ", err)
+						fmt.Println("err1 = ", err)
 					}
+					err = postFile(fmt.Sprintf("%s%s.tar.gz", s.Name, s.Version), sn, targetUrl)
+					if err != nil {
+						fmt.Println("err2 = ", err)
+					}
+					//					err = removeCompressFile(s)
+					//					if err != nil {
+					//						fmt.Println("err3 = ", err)
+					//					}
 				}
 			}
 		}
