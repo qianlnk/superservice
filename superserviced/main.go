@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"qianno.xie/superservice/superserviced/command"
-	"qianno.xie/superservice/superserviced/release"
+	"github.com/qianlnk/superservice/superserviced/command"
+	"github.com/qianlnk/superservice/superserviced/release"
 )
 
 func main() {

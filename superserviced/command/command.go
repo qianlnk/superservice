@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"qianno.xie/longsocket"
-	"qianno.xie/superservice/superserviced/service"
+	"github.com/qianlnk/longsocket"
+	"github.com/qianlnk/superservice/superserviced/service"
 )
 
 type User struct {

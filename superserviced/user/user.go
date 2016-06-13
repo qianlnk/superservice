@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"qianno.xie/superservice/superserviced/storage"
+	"github.com/qianlnk/superservice/superserviced/storage"
 )
 
 type User struct {

@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"qianno.xie/superservice/superserviced/storage"
+	"github.com/qianlnk/superservice/superserviced/storage"
 )
 
 type Service struct {

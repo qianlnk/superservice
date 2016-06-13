@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"qianno.xie/longsocket"
+
+	"github.com/qianlnk/longsocket"
 )
 
 type Service struct {

@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"qianno.xie/superservice/superservicectl/command"
-	"qianno.xie/terminal"
+	"github.com/qianlnk/superservice/superservicectl/command"
+	"github.com/qianlnk/terminal"
 )
 
 func main() {

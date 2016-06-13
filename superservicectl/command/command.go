@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"qianno.xie/longsocket"
-	"qianno.xie/superservice/superservicectl/service"
+	"github.com/qianlnk/longsocket"
+	"github.com/qianlnk/superservice/superservicectl/service"
 )
 
 /*******************************************
