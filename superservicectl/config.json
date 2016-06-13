@@ -8,16 +8,16 @@
 				{
 					"Name": "helloLnk",
 					"Version": "0.1.0",
-					"Command": "./hello/hello lnk",
-					"Directory": "/usr/local/hello",
+					"Command": "/usr/local/helloLnk/hello lnk",
+					"Directory": "/usr/local",
 					"User": "root",
 					"AutoStart": true,
 					"AutoRestart": true
 				},{
 					"Name": "helloXzj",
 					"Version": "0.1.1",
-					"Command": "./hello/hello xzj",
-					"Directory": "/usr/local/hello",
+					"Command": "/usr/local/helloXzj/hello xzj",
+					"Directory": "/usr/local",
 					"User": "xiezhenjia",
 					"AutoStart": true,
 					"AutoRestart": true
@@ -31,16 +31,16 @@
 				{
 					"Name": "helloTest",
 					"Version": "0.1.0",
-					"Command": "./hello/hello test",
-					"Directory": "/usr/local/hello",
+					"Command": "/usr/local/helloTest/hello test",
+					"Directory": "/usr/local",
 					"User": "root",
 					"AutoStart": false,
 					"AutoRestart": false
 				},{
 					"Name": "helloCeCe",
 					"Version": "0.1.0",
-					"Command": "./hello/hello cece",
-					"Directory": "/usr/local/hello",
+					"Command": "/usr/local/helloCeCe/hello cece",
+					"Directory": "/usr/local",
 					"User": "root",
 					"AutoStart": false,
 					"AutoRestart": false

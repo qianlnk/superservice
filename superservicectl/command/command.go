@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/qianlnk/compress"
 	"github.com/qianlnk/longsocket"
 	"github.com/qianlnk/superservice/superservicectl/service"
 )
@@ -263,18 +264,7 @@ func postFile(file, fileName string, targetUrl string) error {
 }
 
 func compressFile(s service.Service) error {
-	cmd := exec.Command("tar", "cvzf", fmt.Sprintf("%s%s.tar.gz", s.Name, s.Version), "-C", "/Users/xiezhenjia/go/src/qianno.xie/superservice/superservicectl/programs", s.Name)
-	what, err := cmd.Output()
-	if err != nil {
-		fmt.Println("1 ", err, string(what))
-		return err
-	}
-	err = cmd.Start()
-	if err != nil {
-		fmt.Println("2 ", err)
-		return err
-	}
-	return cmd.Wait()
+	return compress.Compress(fmt.Sprintf("/Users/xiezhenjia/go/src/qianno.xie/superservice/superservicectl/programs/%s", s.Name), fmt.Sprintf("%s%s.tar.gz", s.Name, s.Version))
 }
 
 func removeCompressFile(s service.Service) error {
