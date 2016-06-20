@@ -29,10 +29,17 @@ type Cmd struct {
 	service.Service
 }
 
+var message chan string
+
+func init() {
+	message = make(chan string, 1)
+
+}
+
 //exec command
 func dealCommand(cmd Cmd, l *longsocket.Longsocket) {
 	fmt.Println(cmd)
-	message := make(chan string, 1)
+
 	//defer close(message)
 	go sendMessage(message, l)
 	switch strings.ToUpper(cmd.Type) {
