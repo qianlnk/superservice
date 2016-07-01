@@ -320,7 +320,10 @@ func (ctl *Command) showResMessage(msg []byte, l *longsocket.Longsocket) {
 	if err != nil {
 		for _, v := range ctl.ConnectMachineList {
 			if v.Ls == l {
-				fmt.Println(v.Name, ":", string(msg))
+				//fmt.Println(v.Name, ":", string(msg))
+				fmt.Printf("\033[%dD", len("> "))
+				fmt.Printf("%s:%s", v.Name, string(msg))
+				fmt.Printf("\n> ")
 				break
 			}
 		}
@@ -331,7 +334,9 @@ func (ctl *Command) showResMessage(msg []byte, l *longsocket.Longsocket) {
 				break
 			}
 		}
-		fmt.Printf("host: %s\tservice:%s\t\t%s\t%d\t%s\t%s\n", resList.Host, resList.Service, resList.Status, resList.Pid, resList.User, resList.Command)
+		fmt.Printf("\033[%dD", len("> "))
+		fmt.Printf("host: %-20s\tservice:%-20s\t\t%s\t%d\t%-20s\t%-20s", resList.Host, resList.Service, resList.Status, resList.Pid, resList.User, resList.Command)
+		fmt.Printf("\n> ")
 	}
 
 }
