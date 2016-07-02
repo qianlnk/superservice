@@ -264,7 +264,7 @@ func postFile(file, fileName string, targetUrl string) error {
 }
 
 func compressFile(s service.Service) error {
-	return compress.Compress(fmt.Sprintf("/Users/xiezhenjia/go/src/qianno.xie/superservice/superservicectl/programs/%s", s.Name), fmt.Sprintf("%s%s.tar.gz", s.Name, s.Version))
+	return compress.Compress(fmt.Sprintf("/Users/xiezhenjia/go/src/github.com/qianlnk/superservice/superservicectl/programs/%s", s.Name), fmt.Sprintf("%s%s.tar.gz", s.Name, s.Version))
 }
 
 func removeCompressFile(s service.Service) error {
