@@ -39,9 +39,9 @@ type Cmd struct {
 //exec command
 func dealCommand(cmd Cmd, l *longsocket.Longsocket) {
 	fmt.Println(cmd)
-	message := make(chan string, 1)
+	message := l.GetWriteChan()
 	//defer close(message)
-	go sendMessage(message, l)
+	//go sendMessage(message, l)
 	switch strings.ToUpper(cmd.Type) {
 	case "ADD":
 		service.ServiceList.UpdateService(cmd.Name, cmd.Version, cmd.Command, cmd.Directory, cmd.User, cmd.AutoStart, cmd.AutoRestart, message)

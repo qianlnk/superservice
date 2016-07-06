@@ -35,7 +35,7 @@ type Services map[string]*Service
 var (
 	Mu          sync.Mutex
 	ServiceList Services
-	Message     chan string
+	Message     chan []byte
 )
 
 const (
@@ -43,40 +43,40 @@ const (
 	STOP    = "STOP"
 )
 
-func MSG_UPDATE(name string) string {
-	return fmt.Sprintf("service %s updating", name)
+func MSG_UPDATE(name string) []byte {
+	return []byte(fmt.Sprintf("service %s updating", name))
 }
 
-func MSG_ADD(name string) string {
-	return fmt.Sprintf("service %s adding", name)
+func MSG_ADD(name string) []byte {
+	return []byte(fmt.Sprintf("service %s adding", name))
 }
 
-func MSG_DELETE(name string) string {
-	return fmt.Sprintf("service %s deleting", name)
+func MSG_DELETE(name string) []byte {
+	return []byte(fmt.Sprintf("service %s deleting", name))
 }
 
-func MSG_START(name string) string {
-	return fmt.Sprintf("service %s starting", name)
+func MSG_START(name string) []byte {
+	return []byte(fmt.Sprintf("service %s starting", name))
 }
 
-func MSG_STOP(name string) string {
-	return fmt.Sprintf("service %s stoping", name)
+func MSG_STOP(name string) []byte {
+	return []byte(fmt.Sprintf("service %s stoping", name))
 }
 
-func MSG_OK(name string) string {
-	return fmt.Sprintf("service %s ok", name)
+func MSG_OK(name string) []byte {
+	return []byte(fmt.Sprintf("service %s ok", name))
 }
 
-func MSG_NO_CHANGE(name string) string {
-	return fmt.Sprintf("service %s no change", name)
+func MSG_NO_CHANGE(name string) []byte {
+	return []byte(fmt.Sprintf("service %s no change", name))
 }
 
-func MSG_ERROR(err error) string {
-	return fmt.Sprintf("Err: %s", err.Error())
+func MSG_ERROR(err error) []byte {
+	return []byte(fmt.Sprintf("Err: %s", err.Error()))
 }
 
-func MSG_EXIT(funcname string) string {
-	return fmt.Sprintf("func %s exit", funcname)
+func MSG_EXIT(funcname string) []byte {
+	return []byte(fmt.Sprintf("func %s exit", funcname))
 }
 func init() {
 	ServiceList = make(map[string]*Service)
@@ -106,7 +106,7 @@ func (svclst Services) ReadStorage() {
 		fmt.Println(err)
 		return
 	}
-	msg := make(chan string)
+	msg := make(chan []byte)
 	go discardMsg(msg)
 	for _, v := range kvs {
 		var service Service
@@ -118,7 +118,7 @@ func (svclst Services) ReadStorage() {
 	}
 }
 
-func (svclst Services) UpdateService(name, version, command, dir, user string, start, restart bool, msg chan string) {
+func (svclst Services) UpdateService(name, version, command, dir, user string, start, restart bool, msg chan []byte) {
 	bolt := storage.GetBolt("service")
 	runbefore := false
 	if v, ok := svclst[name]; ok {
@@ -149,11 +149,11 @@ func (svclst Services) UpdateService(name, version, command, dir, user string, s
 	}
 }
 
-func discardMsg(msg chan string) {
+func discardMsg(msg chan []byte) {
 	for {
 		select {
 		case m := <-msg:
-			if strings.Contains(m, "exit") || strings.Contains(m, "stop ok") {
+			if strings.Contains(string(m), "exit") || strings.Contains(string(m), "stop ok") {
 				close(msg)
 				return
 			}
@@ -166,7 +166,7 @@ func (svclst Services) AotoRestart() {
 		for k, v := range svclst {
 			fmt.Println(k, v)
 			if v.status == STOP && v.AutoRestart {
-				msg := make(chan string)
+				msg := make(chan []byte)
 				go discardMsg(msg)
 				svclst[k].Start(msg)
 			}
@@ -176,7 +176,7 @@ func (svclst Services) AotoRestart() {
 
 func (svclst Services) Close() {
 	for k, _ := range svclst {
-		msg := make(chan string)
+		msg := make(chan []byte)
 		go discardMsg(msg)
 		err := svclst[k].Stop(msg)
 		if err != nil {
@@ -186,7 +186,7 @@ func (svclst Services) Close() {
 	}
 }
 
-func (svclst Services) Delete(serviceName string, msg chan string) {
+func (svclst Services) Delete(serviceName string, msg chan []byte) {
 	if _, ok := svclst[serviceName]; ok {
 		bolt := storage.GetBolt("service")
 		msg <- MSG_DELETE(serviceName)
@@ -201,7 +201,7 @@ func (svclst Services) Delete(serviceName string, msg chan string) {
 
 	}
 }
-func (svclst Services) List(msg chan string) {
+func (svclst Services) List(msg chan []byte) {
 	for _, v := range svclst {
 		//{"Name":"xzj","Command":"./hello/hello xzj","Directory":"","User":"xiezhenjia","AutoStart":true,"AutoRestart":true}
 		var tmpmsg string
@@ -212,11 +212,11 @@ func (svclst Services) List(msg chan string) {
 			tmpmsg = fmt.Sprintf("{\"Service\":\"%s\",\"Status\":\"%s\",\"Pid\":%d,\"User\":\"%s\", \"Command\":\"%s\"}",
 				v.Name, v.status, 0, v.User, v.Command)
 		}
-		msg <- string(tmpmsg)
+		msg <- []byte(tmpmsg)
 	}
 }
 
-func (svc *Service) Start(msg chan string) {
+func (svc *Service) Start(msg chan []byte) {
 	msg <- MSG_START(svc.Name)
 	if svc.status == RUNNING {
 		msg <- MSG_ERROR(errors.New(fmt.Sprintf("%s already running.", svc.Name)))
@@ -263,7 +263,7 @@ func (svc *Service) Start(msg chan string) {
 	}()
 }
 
-func (svc *Service) Stop(msg chan string) error {
+func (svc *Service) Stop(msg chan []byte) error {
 	msg <- MSG_STOP(svc.Name)
 	if svc.status == STOP {
 		msg <- MSG_OK(svc.Name)
@@ -280,7 +280,7 @@ func (svc *Service) Stop(msg chan string) error {
 	return nil
 }
 
-func (svc *Service) Restart(msg chan string) {
+func (svc *Service) Restart(msg chan []byte) {
 	err := svc.Stop(msg)
 	if err != nil {
 		return
