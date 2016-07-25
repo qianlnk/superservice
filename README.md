@@ -8,6 +8,8 @@
 	SSSSSSSSSSS     UUUUUUUUUUUU    PPPP             PPPP            EEEE            RRRR  RRRRRR
 	  SSSSSSSS        UUUUUUUU      PPPP             PPPP            EEEEEEEEEEEE    RRRR     RRRR SERVICE
 　　　
+[![Build Status](https://travis-ci.org/qianlnk/superservice.svg?branch=master)](https://travis-ci.org/qianlnk/superservice)
+
 # superservice
 ----
 Super service is a project witch collection of release, monitoring, alarm and operation service.
